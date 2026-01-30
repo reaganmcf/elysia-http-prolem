@@ -1,6 +1,6 @@
-import { expect, describe, it } from "bun:test";
-import { HttpError } from "../src/errors";
+import { describe, expect, it } from "bun:test";
 import { Elysia, InternalServerError } from "elysia";
+import { HttpError } from "../src/errors";
 import { httpProblemJsonPlugin } from "../src/index";
 
 describe("HttpError.InternalServerError", () => {
@@ -15,10 +15,15 @@ describe("HttpError.InternalServerError", () => {
     const json = await res.json();
 
     expect(res.status).toBe(500);
+    // RFC 9457 Section 6: Content-Type must be application/problem+json
+    expect(res.headers.get("Content-Type")).toContain(
+      "application/problem+json"
+    );
     expect(json).toEqual({
       type: "https://httpstatuses.com/500",
       title: "Internal Server Error",
       status: 500,
+      instance: "/error",
       detail: "Database connection failed",
     });
   });
@@ -34,10 +39,14 @@ describe("HttpError.InternalServerError", () => {
     const json = await res.json();
 
     expect(res.status).toBe(500);
+    expect(res.headers.get("Content-Type")).toBe(
+      "application/problem+json; charset=utf-8"
+    );
     expect(json).toEqual({
       type: "https://httpstatuses.com/500",
       title: "Internal Server Error",
       status: 500,
+      instance: "/error",
       detail: "Something went wrong",
     });
   });
@@ -53,10 +62,14 @@ describe("HttpError.InternalServerError", () => {
     const json = await res.json();
 
     expect(res.status).toBe(500);
+    expect(res.headers.get("Content-Type")).toBe(
+      "application/problem+json; charset=utf-8"
+    );
     expect(json).toEqual({
       type: "https://httpstatuses.com/500",
       title: "Internal Server Error",
       status: 500,
+      instance: "/error",
       detail: "Elysia internal error",
     });
   });

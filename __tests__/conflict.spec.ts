@@ -1,6 +1,6 @@
-import { expect, describe, it } from "bun:test";
-import { HttpError } from "../src/errors";
+import { describe, expect, it } from "bun:test";
 import { Elysia } from "elysia";
+import { HttpError } from "../src/errors";
 import { httpProblemJsonPlugin } from "../src/index";
 
 describe("HttpError.Conflict", () => {
@@ -15,10 +15,15 @@ describe("HttpError.Conflict", () => {
     const json = await res.json();
 
     expect(res.status).toBe(409);
+    // RFC 9457 Section 6: Content-Type must be application/problem+json
+    expect(res.headers.get("Content-Type")).toContain(
+      "application/problem+json"
+    );
     expect(json).toEqual({
       type: "https://httpstatuses.com/409",
       title: "Conflict",
       status: 409,
+      instance: "/resource",
       detail: "Resource already exists",
     });
   });

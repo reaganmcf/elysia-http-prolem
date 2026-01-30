@@ -1,8 +1,8 @@
-import { expect, describe, it } from "bun:test";
-import { HttpError } from "../src/errors";
+import { describe, expect, it } from "bun:test";
 import { Elysia, fileType, InvalidCookieSignature } from "elysia";
-import { httpProblemJsonPlugin } from "../src/index";
 import z from "zod";
+import { HttpError } from "../src/errors";
+import { httpProblemJsonPlugin } from "../src/index";
 
 describe("HttpError.BadRequest", () => {
   it("should handle explicit HttpError.BadRequest", async () => {
@@ -12,6 +12,7 @@ describe("HttpError.BadRequest", () => {
         throw new HttpError.BadRequest("This is a bad request", {
           field: "name",
           message: "Name is required",
+          instance: "/foo",
         });
       });
 
@@ -19,13 +20,17 @@ describe("HttpError.BadRequest", () => {
     const json = await res.json();
 
     expect(res.status).toBe(400);
+    // RFC 9457 Section 6: Content-Type must be application/problem+json
+    expect(res.headers.get("Content-Type")).toContain(
+      "application/problem+json; charset=utf-8"
+    );
     expect(json).toEqual({
       type: "https://httpstatuses.com/400",
       title: "Bad Request",
       status: 400,
       detail: "This is a bad request",
       field: "name",
-      message: "Name is required",
+      instance: "/foo",
     });
   });
 
@@ -39,25 +44,29 @@ describe("HttpError.BadRequest", () => {
         params: z.object({
           id: z.coerce.number(),
         }),
-      },
+      }
     );
 
     const res = await app.handle(new Request("http://localhost/foo/forty"));
     const json = await res.json();
 
     expect(res.status).toBe(400);
+    expect(res.headers.get("Content-Type")).toBe(
+      "application/problem+json; charset=utf-8"
+    );
     expect(json).toEqual({
       type: "https://httpstatuses.com/400",
       title: "Bad Request",
       status: 400,
-      detail: "The request is invalid",
+      detail: "Validation Failed",
+      instance: "/foo/forty",
       errors: [
         {
-          code: "invalid_type",
-          expected: "number",
-          received: "NaN",
-          path: ["id"],
           message: "Invalid input: expected number, received NaN",
+          path: "id",
+          value: {
+            id: "forty",
+          },
         },
       ],
     });
@@ -77,15 +86,19 @@ describe("HttpError.BadRequest", () => {
           "Content-Type": "application/json",
         },
         body: "{ invalidJson: true ",
-      }),
+      })
     );
     const json = await res.json();
 
     expect(res.status).toBe(400);
+    expect(res.headers.get("Content-Type")).toBe(
+      "application/problem+json; charset=utf-8"
+    );
     expect(json).toEqual({
       type: "https://httpstatuses.com/400",
       title: "Bad Request",
       status: 400,
+      instance: "/foo",
       detail: "The request could not be parsed: Bad Request",
     });
   });
@@ -101,10 +114,14 @@ describe("HttpError.BadRequest", () => {
     const json = await res.json();
 
     expect(res.status).toBe(400);
+    expect(res.headers.get("Content-Type")).toBe(
+      "application/problem+json; charset=utf-8"
+    );
     expect(json).toEqual({
       type: "https://httpstatuses.com/400",
       title: "Bad Request",
       status: 400,
+      instance: "/protected",
       detail: "The provided cookie signature is invalid",
       key: "foo",
     });
@@ -121,7 +138,7 @@ describe("HttpError.BadRequest", () => {
         body: z.object({
           file: z.file(),
         }),
-      },
+      }
     );
 
     const jpegFile = new File(["dummy content"], "photo.jpg", {
@@ -134,15 +151,19 @@ describe("HttpError.BadRequest", () => {
       new Request("http://localhost/upload", {
         method: "POST",
         body: formData,
-      }),
+      })
     );
 
     const json = await res.json();
     expect(res.status).toBe(400);
+    expect(res.headers.get("Content-Type")).toBe(
+      "application/problem+json; charset=utf-8"
+    );
     expect(json).toEqual({
       type: "https://httpstatuses.com/400",
       title: "Bad Request",
       status: 400,
+      instance: "/upload",
       detail: '"photo.jpg" has invalid file type',
       property: "photo.jpg",
       expected: "application/json",
